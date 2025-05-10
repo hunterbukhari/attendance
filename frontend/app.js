@@ -1,4 +1,4 @@
-const API_BASE = 'https://<your-service>.onrender.com';  // عدّل هذا إلى رابط خدمتك
+const API_BASE = 'https://attendance-hbe3.onrender.com';  // عدّل هذا إلى رابط خدمتك
 
 // عناصر الـ DOM
 const loginSec = document.getElementById('login-section');
