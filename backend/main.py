@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import auth, attendance, export_excel
+from backend.routers import auth, attendance, export_excel
 
 app = FastAPI()
 
