@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>نظام حضور وغياب</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family: sans-serif; max-width: 400px; margin: auto; padding: 20px;">
+
+  <h1>نظام حضور وغياب</h1>
+
+  <!-- تسجيل الدخول -->
+  <section id="login-section">
+    <h2>تسجيل الدخول</h2>
+    <input id="nid" type="text" placeholder="رقم الهوية" /><br><br>
+    <input id="pwd" type="password" placeholder="كلمة المرور" /><br><br>
+    <button id="btn-login">دخول</button>
+    <p id="login-msg" style="color: red;"></p>
+  </section>
+
+  <!-- بعد تسجيل الدخول -->
+  <section id="app-section" style="display: none;">
+    <p>مرحبًا، أنت مسجّل دخول!</p>
+    <button id="btn-checkin">تسجيل حضور</button>
+    <p id="checkin-msg" style="color: green;"></p>
+    <hr>
+
+    <h3>تصدير تقرير Excel</h3>
+    من: <input id="start" type="date" /> إلى: <input id="end" type="date" /><br><br>
+    <button id="btn-export">تنزيل Excel</button>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
