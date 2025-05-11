@@ -1,5 +1,21 @@
 const API_BASE = 'https://attendance-hbe3.onrender.com';  // عدّل هذا إلى رابط خدمتك
 
+// دالة للحصول على الموقع الجغرافي
+function getCurrentLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      return reject(new Error('المتصفح لا يدعم تحديد الموقع'));
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({
+        latitude:  pos.coords.latitude,
+        longitude: pos.coords.longitude
+      }),
+      err => reject(new Error('تعذّر الحصول على الموقع: ' + err.message))
+    );
+  });
+}
+
 // عناصر الـ DOM
 const loginSec   = document.getElementById('login-section');
 const appSec     = document.getElementById('app-section');
@@ -29,14 +45,19 @@ document.getElementById('btn-login').onclick = async () => {
   }
 };
 
-// تسجيل حضور (Check-In)
+// تسجيل حضور (Check-In) مع GPS
 document.getElementById('btn-checkin').onclick = async () => {
   msgCheck.textContent = '';
-  const token = localStorage.getItem('token');
   try {
+    const loc = await getCurrentLocation();
+    const token = localStorage.getItem('token');
     const res = await fetch(`${API_BASE}/attendance/check-in`, {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token }
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify(loc)
     });
     const data = await res.json();
     msgCheck.style.color = res.ok ? 'green' : 'red';
@@ -47,14 +68,19 @@ document.getElementById('btn-checkin').onclick = async () => {
   }
 };
 
-// تسجيل انصراف (Check-Out)
+// تسجيل انصراف (Check-Out) مع GPS
 document.getElementById('btn-checkout').onclick = async () => {
   msgCheck.textContent = '';
-  const token = localStorage.getItem('token');
   try {
+    const loc = await getCurrentLocation();
+    const token = localStorage.getItem('token');
     const res = await fetch(`${API_BASE}/attendance/check-out`, {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token }
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify(loc)
     });
     const data = await res.json();
     msgCheck.style.color = res.ok ? 'green' : 'red';
