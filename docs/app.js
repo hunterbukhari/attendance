@@ -1,12 +1,12 @@
-const API_BASE = 'https://attendance-hbe3.onrender.com';  // رابط خدمتك على Render
+const API_BASE = 'https://attendance-hbe3.onrender.com';  // عدّل هذا إلى رابط خدمتك
 
 // عناصر الـ DOM
-const loginSec    = document.getElementById('login-section');
-const appSec      = document.getElementById('app-section');
-const msgLogin    = document.getElementById('login-msg');
-const msgAttend   = document.getElementById('attendance-msg');
-const msgExport   = document.getElementById('export-msg');       // (إن أردت رسالة مخصصة للتصدير)
-const msgChange   = document.getElementById('change-msg');
+const loginSec   = document.getElementById('login-section');
+const appSec     = document.getElementById('app-section');
+const msgLogin   = document.getElementById('login-msg');
+const msgCheck   = document.getElementById('attendance-msg');
+const msgChange  = document.getElementById('change-msg');
+const msgExport  = document.getElementById('export-msg');   // عنصر الرسالة للتصدير
 
 // تسجيل الدخول
 document.getElementById('btn-login').onclick = async () => {
@@ -31,7 +31,7 @@ document.getElementById('btn-login').onclick = async () => {
 
 // تسجيل حضور (Check-In)
 document.getElementById('btn-checkin').onclick = async () => {
-  msgAttend.textContent = '';
+  msgCheck.textContent = '';
   const token = localStorage.getItem('token');
   try {
     const res = await fetch(`${API_BASE}/attendance/check-in`, {
@@ -39,17 +39,17 @@ document.getElementById('btn-checkin').onclick = async () => {
       headers: { 'Authorization': 'Bearer ' + token }
     });
     const data = await res.json();
-    msgAttend.style.color = res.ok ? 'green' : 'red';
-    msgAttend.textContent = data.message || data.detail;
+    msgCheck.style.color = res.ok ? 'green' : 'red';
+    msgCheck.textContent = data.message || data.detail;
   } catch (e) {
-    msgAttend.style.color = 'red';
-    msgAttend.textContent = e.message;
+    msgCheck.style.color = 'red';
+    msgCheck.textContent = e.message;
   }
 };
 
 // تسجيل انصراف (Check-Out)
 document.getElementById('btn-checkout').onclick = async () => {
-  msgAttend.textContent = '';
+  msgCheck.textContent = '';
   const token = localStorage.getItem('token');
   try {
     const res = await fetch(`${API_BASE}/attendance/check-out`, {
@@ -57,43 +57,52 @@ document.getElementById('btn-checkout').onclick = async () => {
       headers: { 'Authorization': 'Bearer ' + token }
     });
     const data = await res.json();
-    msgAttend.style.color = res.ok ? 'green' : 'red';
-    msgAttend.textContent = data.message || data.detail;
+    msgCheck.style.color = res.ok ? 'green' : 'red';
+    msgCheck.textContent = data.message || data.detail;
   } catch (e) {
-    msgAttend.style.color = 'red';
-    msgAttend.textContent = e.message;
+    msgCheck.style.color = 'red';
+    msgCheck.textContent = e.message;
   }
 };
 
 // تصدير تقرير Excel
 document.getElementById('btn-export').onclick = () => {
+  msgExport.textContent = '';
   const token = localStorage.getItem('token');
   const start = document.getElementById('start').value;
   const end   = document.getElementById('end').value;
-  if (!start || !end) return alert('حدد الفترة أولاً');
+  if (!start || !end) {
+    msgExport.style.color = 'red';
+    return msgExport.textContent = 'حدد الفترة أولاً';
+  }
   const url = `${API_BASE}/export/excel?start_date=${start}&end_date=${end}`;
   fetch(url, {
     headers: { 'Authorization': 'Bearer ' + token }
   })
-    .then(res => {
-      if (!res.ok) throw new Error('فشل التصدير');
-      return res.blob();
-    })
-    .then(blob => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `attendance_${start}_to_${end}.xlsx`;
-      a.click();
-    })
-    .catch(e => alert(e.message));
+  .then(res => {
+    if (!res.ok) throw new Error('فشل التصدير');
+    return res.blob();
+  })
+  .then(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `attendance_${start}_to_${end}.xlsx`;
+    a.click();
+    msgExport.style.color = 'green';
+    msgExport.textContent = 'تم تنزيل التقرير بنجاح';
+  })
+  .catch(e => {
+    msgExport.style.color = 'red';
+    msgExport.textContent = e.message;
+  });
 };
 
 // تغيير كلمة المرور
 document.getElementById('btn-change-pwd').onclick = async () => {
   msgChange.textContent = '';
-  const token   = localStorage.getItem('token');
-  const oldPwd  = document.getElementById('old-pwd').value;
-  const newPwd  = document.getElementById('new-pwd').value;
+  const token  = localStorage.getItem('token');
+  const oldPwd = document.getElementById('old-pwd').value;
+  const newPwd = document.getElementById('new-pwd').value;
   try {
     const res = await fetch(`${API_BASE}/auth/change-password`, {
       method: 'POST',
@@ -107,7 +116,6 @@ document.getElementById('btn-change-pwd').onclick = async () => {
     if (!res.ok) throw new Error(data.detail || 'فشل تغيير كلمة المرور');
     msgChange.style.color = 'green';
     msgChange.textContent = data.message;
-    // تفريغ الحقول
     document.getElementById('old-pwd').value = '';
     document.getElementById('new-pwd').value = '';
   } catch (e) {
