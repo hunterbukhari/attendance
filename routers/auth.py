@@ -44,3 +44,56 @@ def login(national_id: str, password: str):
     db.commit()
 
     return {"session_id": session_id}
+
+# التحقق من الجلسة واستخراج المستخدم
+def get_current_user(session_id: str = Cookie(...)):
+    db: Session = SessionLocal()
+    session = db.execute(
+        "SELECT user_id, expires_at FROM sessions WHERE session_id = :sid",
+        {"sid": session_id}
+    ).fetchone()
+    if not session or session.expires_at < datetime.utcnow():
+        raise HTTPException(401, "انتهت صلاحية الجلسة أو غير موجودة")
+    return session.user_id
+
+# تسجيل حضور
+@router.post("/attendance/check-in")
+def check_in(user_id: int = Depends(get_current_user)):
+    db: Session = SessionLocal()
+    today = datetime.utcnow().date()
+
+    already_checked = db.execute(
+        "SELECT 1 FROM attendance WHERE user_id = :uid AND timestamp::date = :d AND type = 'in'",
+        {"uid": user_id, "d": today}
+    ).fetchone()
+
+    if already_checked:
+        raise HTTPException(400, "تم تسجيل الحضور مسبقاً")
+
+    db.execute(
+        "INSERT INTO attendance (user_id, type, device_info, latitude, longitude) VALUES (:uid, 'in', 'web', 0.0, 0.0)",
+        {"uid": user_id}
+    )
+    db.commit()
+    return {"message": "تم تسجيل الحضور"}
+
+# تسجيل انصراف
+@router.post("/attendance/check-out")
+def check_out(user_id: int = Depends(get_current_user)):
+    db: Session = SessionLocal()
+    today = datetime.utcnow().date()
+
+    already_checked = db.execute(
+        "SELECT 1 FROM attendance WHERE user_id = :uid AND timestamp::date = :d AND type = 'out'",
+        {"uid": user_id, "d": today}
+    ).fetchone()
+
+    if already_checked:
+        raise HTTPException(400, "تم تسجيل الانصراف مسبقاً")
+
+    db.execute(
+        "INSERT INTO attendance (user_id, type, device_info, latitude, longitude) VALUES (:uid, 'out', 'web', 0.0, 0.0)",
+        {"uid": user_id}
+    )
+    db.commit()
+    return {"message": "تم تسجيل الانصراف"}
