@@ -30,3 +30,28 @@ def check_in(user_id: int = Depends(get_current_user)):
     )
     db.commit()
     return {"message": "تم تسجيل الحضور"}
+    
+@router.post("/check-out")
+def check_out(user_id: int = Depends(get_current_user)):
+    db: Session = SessionLocal()
+    today = datetime.utcnow().date()
+    # تأكد أنه سبق وأن سجل حضور اليوم
+    has_in = db.execute(
+        "SELECT 1 FROM attendance WHERE user_id=:uid AND timestamp::date=:d AND type='in'",
+        {"uid": user_id, "d": today}
+    ).fetchone()
+    if not has_in:
+        raise HTTPException(400, "لم تسجل حضور اليوم")
+    # تأكد أنه لم يسجل انصراف مسبقاً
+    has_out = db.execute(
+        "SELECT 1 FROM attendance WHERE user_id=:uid AND timestamp::date=:d AND type='out'",
+        {"uid": user_id, "d": today}
+    ).fetchone()
+    if has_out:
+        raise HTTPException(400, "تم تسجيل انصراف اليوم مسبقاً")
+    db.execute(
+        "INSERT INTO attendance (user_id, device_info, type) VALUES (:uid, :di, 'out')",
+        {"uid": user_id, "di": "web"}
+    )
+    db.commit()
+    return {"message": "تم تسجيل الانصراف"}
