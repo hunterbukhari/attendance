@@ -1,31 +1,37 @@
-from fastapi import APIRouter, HTTPException, Depends, Cookie
+from fastapi import APIRouter, HTTPException, Response, Depends, Cookie
 from sqlalchemy.orm import Session
 from passlib.hash import bcrypt
-from database import SessionLocal
-from datetime import datetime, timedelta
 import uuid
+from datetime import datetime, timedelta
+from database import SessionLocal
 
 router = APIRouter()
 
-# تسجيل مستخدم جديد
+# إنشاء اتصال بقاعدة البيانات
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# تسجيل مستخدم جديد (اختياري للإدارة)
 @router.post("/register")
-def register(national_id: str, password: str):
-    db: Session = SessionLocal()
-    pw_hash = bcrypt.hash(password)
+def register(national_id: str, password: str, db: Session = Depends(get_db)):
+    password_hash = bcrypt.hash(password)
     try:
         db.execute(
             "INSERT INTO users (national_id, password_hash) VALUES (:nid, :ph)",
-            {"nid": national_id, "ph": pw_hash}
+            {"nid": national_id, "ph": password_hash}
         )
         db.commit()
     except:
-        raise HTTPException(400, "رقم الهوية موجود مسبقاً")
-    return {"message": "تم التسجيل"}
+        raise HTTPException(400, "رقم الهوية مستخدم بالفعل")
+    return {"message": "تم إنشاء الحساب بنجاح"}
 
-# تسجيل الدخول
+# تسجيل الدخول - ينشئ جلسة ويرسل كوكي HttpOnly
 @router.post("/login")
-def login(national_id: str, password: str):
-    db: Session = SessionLocal()
+def login(national_id: str, password: str, response: Response, db: Session = Depends(get_db)):
     user = db.execute(
         "SELECT id, password_hash FROM users WHERE national_id = :nid",
         {"nid": national_id}
@@ -34,66 +40,70 @@ def login(national_id: str, password: str):
     if not user or not bcrypt.verify(password, user.password_hash):
         raise HTTPException(401, "بيانات الدخول غير صحيحة")
 
+    # إنشاء جلسة جديدة
     session_id = str(uuid.uuid4())
-    expiry = datetime.utcnow() + timedelta(minutes=15)
+    expires_at = datetime.utcnow() + timedelta(days=1)
 
     db.execute(
         "INSERT INTO sessions (session_id, user_id, expires_at) VALUES (:sid, :uid, :exp)",
-        {"sid": session_id, "uid": user.id, "exp": expiry}
+        {"sid": session_id, "uid": user.id, "exp": expires_at}
     )
     db.commit()
 
-    return {"session_id": session_id}
+    # إرسال الكوكي للمتصفح
+    response.set_cookie(
+        key="session_id",
+        value=session_id,
+        httponly=True,
+        samesite="strict",
+        secure=True,  # اجعلها False للتجربة المحلية بدون HTTPS
+        expires=int(expires_at.timestamp())
+    )
 
-# التحقق من الجلسة واستخراج المستخدم
-def get_current_user(session_id: str = Cookie(...)):
-    db: Session = SessionLocal()
-    session = db.execute(
+    return {"message": "تم تسجيل الدخول بنجاح"}
+
+# استخراج المستخدم من الكوكي
+@router.get("/me")
+def get_me(session_id: str = Cookie(None), db: Session = Depends(get_db)):
+    if not session_id:
+        raise HTTPException(401, "لم يتم تسجيل الدخول")
+    row = db.execute(
         "SELECT user_id, expires_at FROM sessions WHERE session_id = :sid",
         {"sid": session_id}
     ).fetchone()
-    if not session or session.expires_at < datetime.utcnow():
-        raise HTTPException(401, "انتهت صلاحية الجلسة أو غير موجودة")
-    return session.user_id
+    if not row or row.expires_at < datetime.utcnow():
+        raise HTTPException(401, "الجلسة منتهية أو غير صالحة")
+    return {"user_id": row.user_id}
 
-# تسجيل حضور
-@router.post("/attendance/check-in")
-def check_in(user_id: int = Depends(get_current_user)):
-    db: Session = SessionLocal()
-    today = datetime.utcnow().date()
+# تغيير كلمة المرور
+@router.post("/change-password")
+def change_password(
+    old_password: str,
+    new_password: str,
+    session_id: str = Cookie(None),
+    db: Session = Depends(get_db)
+):
+    if not session_id:
+        raise HTTPException(401, "غير مسجل دخول")
+    session = db.execute(
+        "SELECT user_id FROM sessions WHERE session_id = :sid",
+        {"sid": session_id}
+    ).fetchone()
+    if not session:
+        raise HTTPException(401, "جلسة غير صالحة")
 
-    already_checked = db.execute(
-        "SELECT 1 FROM attendance WHERE user_id = :uid AND timestamp::date = :d AND type = 'in'",
-        {"uid": user_id, "d": today}
+    user = db.execute(
+        "SELECT password_hash FROM users WHERE id = :uid",
+        {"uid": session.user_id}
     ).fetchone()
 
-    if already_checked:
-        raise HTTPException(400, "تم تسجيل الحضور مسبقاً")
+    if not user or not bcrypt.verify(old_password, user.password_hash):
+        raise HTTPException(403, "كلمة المرور القديمة غير صحيحة")
 
+    new_hash = bcrypt.hash(new_password)
     db.execute(
-        "INSERT INTO attendance (user_id, type, device_info, latitude, longitude) VALUES (:uid, 'in', 'web', 0.0, 0.0)",
-        {"uid": user_id}
+        "UPDATE users SET password_hash = :ph WHERE id = :uid",
+        {"ph": new_hash, "uid": session.user_id}
     )
     db.commit()
-    return {"message": "تم تسجيل الحضور"}
-
-# تسجيل انصراف
-@router.post("/attendance/check-out")
-def check_out(user_id: int = Depends(get_current_user)):
-    db: Session = SessionLocal()
-    today = datetime.utcnow().date()
-
-    already_checked = db.execute(
-        "SELECT 1 FROM attendance WHERE user_id = :uid AND timestamp::date = :d AND type = 'out'",
-        {"uid": user_id, "d": today}
-    ).fetchone()
-
-    if already_checked:
-        raise HTTPException(400, "تم تسجيل الانصراف مسبقاً")
-
-    db.execute(
-        "INSERT INTO attendance (user_id, type, device_info, latitude, longitude) VALUES (:uid, 'out', 'web', 0.0, 0.0)",
-        {"uid": user_id}
-    )
-    db.commit()
-    return {"message": "تم تسجيل الانصراف"}
+    return {"message": "تم تغيير كلمة المرور بنجاح"}
