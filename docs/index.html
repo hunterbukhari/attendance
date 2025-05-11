@@ -22,8 +22,16 @@
   <section id="app-section" style="display: none;">
     <p>مرحبًا، أنت مسجّل دخول!</p>
     <button id="btn-checkin">تسجيل حضور</button>
-    <p id="checkin-msg" style="color: green;"></p>
+    <button id="btn-checkout">تسجيل انصراف</button>
+    <p id="attendance-msg" style="color: green;"></p>
     <hr>
+    <!-- ضمن <section id="app-section"> بعد زر التصدير -->
+    <hr>
+    <h3>تغيير كلمة المرور</h3>
+    <input id="old-pwd" type="password" placeholder="كلمة المرور القديمة" /><br><br>
+    <input id="new-pwd" type="password" placeholder="كلمة المرور الجديدة" /><br><br>
+    <button id="btn-change-pwd">تغيير كلمة المرور</button>
+    <p id="change-msg"></p>
 
     <h3>تصدير تقرير Excel</h3>
     من: <input id="start" type="date" /> إلى: <input id="end" type="date" /><br><br>
