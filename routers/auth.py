@@ -42,7 +42,7 @@ def login(national_id: str, password: str, response: Response, db: Session = Dep
 
     # إنشاء جلسة جديدة
     session_id = str(uuid.uuid4())
-    expires_at = datetime.utcnow() + timedelta(days=1)
+    expires_at = datetime.utcnow() + timedelta(minutes=15)
 
     db.execute(
         "INSERT INTO sessions (session_id, user_id, expires_at) VALUES (:sid, :uid, :exp)",
