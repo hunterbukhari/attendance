@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from routers import auth, attendance, export_excel
 from database import init_db
+from routers.attendance import router as attendance_router
+from routers.export_excel import router as export_router
 
 app = FastAPI()
 
