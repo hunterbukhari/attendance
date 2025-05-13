@@ -1,3 +1,5 @@
+# routers/auth.py
+
 from fastapi import APIRouter, HTTPException, Response, Depends, Cookie
 from sqlalchemy.orm import Session
 from passlib.hash import bcrypt
@@ -7,7 +9,9 @@ from database import SessionLocal
 
 router = APIRouter()
 
-# إنشاء اتصال بقاعدة البيانات
+SESSION_DURATION = timedelta(minutes=15)
+
+# 1) Dependency لإدارة جلسة قاعدة البيانات
 def get_db():
     db = SessionLocal()
     try:
@@ -15,13 +19,13 @@ def get_db():
     finally:
         db.close()
 
-# تسجيل مستخدم جديد (اختياري للإدارة)
+# 2) مسار إنشاء مستخدم جديد (يستخدمه الأدمن فقط لاحقًا)
 @router.post("/register")
 def register(national_id: str, password: str, db: Session = Depends(get_db)):
     password_hash = bcrypt.hash(password)
     try:
         db.execute(
-            "INSERT INTO users (national_id, password_hash) VALUES (:nid, :ph)",
+            "INSERT INTO users (national_id, password_hash, role) VALUES (:nid, :ph, 'user')",
             {"nid": national_id, "ph": password_hash}
         )
         db.commit()
@@ -29,42 +33,48 @@ def register(national_id: str, password: str, db: Session = Depends(get_db)):
         raise HTTPException(400, "رقم الهوية مستخدم بالفعل")
     return {"message": "تم إنشاء الحساب بنجاح"}
 
-# تسجيل الدخول - ينشئ جلسة ويرسل كوكي HttpOnly
+# 3) تسجيل الدخول وإنشاء جلسة قصيرة الأمد
 @router.post("/login")
-def login(national_id: str, password: str, response: Response, db: Session = Depends(get_db)):
-    user = db.execute(
-        "SELECT id, password_hash FROM users WHERE national_id = :nid",
+def login(
+    national_id: str,
+    password: str,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    row = db.execute(
+        "SELECT id, password_hash, role FROM users WHERE national_id = :nid",
         {"nid": national_id}
     ).fetchone()
-
-    if not user or not bcrypt.verify(password, user.password_hash):
+    if not row or not bcrypt.verify(password, row.password_hash):
         raise HTTPException(401, "بيانات الدخول غير صحيحة")
 
-    # إنشاء جلسة جديدة
+    # إنشاء session_id وجعله صالحًا 15 دقيقة
     session_id = str(uuid.uuid4())
-    expires_at = datetime.utcnow() + timedelta(minutes=15)
+    expires_at = datetime.utcnow() + SESSION_DURATION
 
     db.execute(
         "INSERT INTO sessions (session_id, user_id, expires_at) VALUES (:sid, :uid, :exp)",
-        {"sid": session_id, "uid": user.id, "exp": expires_at}
+        {"sid": session_id, "uid": row.id, "exp": expires_at}
     )
     db.commit()
 
-    # إرسال الكوكي للمتصفح
+    # وضع الكوكي في المتصفح
     response.set_cookie(
         key="session_id",
         value=session_id,
         httponly=True,
         samesite="strict",
-        secure=True,  # اجعلها False للتجربة المحلية بدون HTTPS
+        secure=True,  # أثناء الاختبار المحلي ضع False، للإنتاج ضع True
         expires=int(expires_at.timestamp())
     )
 
-    return {"message": "تم تسجيل الدخول بنجاح"}
+    return {"message": "تم تسجيل الدخول بنجاح", "role": row.role}
 
-# استخراج المستخدم من الكوكي
-@router.get("/me")
-def get_me(session_id: str = Cookie(None), db: Session = Depends(get_db)):
+# 4) استخراج user_id من الكوكي والتحقق من الجلسة
+def get_current_user(
+    session_id: str = Cookie(None),
+    db: Session = Depends(get_db)
+) -> int:
     if not session_id:
         raise HTTPException(401, "لم يتم تسجيل الدخول")
     row = db.execute(
@@ -73,37 +83,22 @@ def get_me(session_id: str = Cookie(None), db: Session = Depends(get_db)):
     ).fetchone()
     if not row or row.expires_at < datetime.utcnow():
         raise HTTPException(401, "الجلسة منتهية أو غير صالحة")
-    return {"user_id": row.user_id}
+    return row.user_id
 
-# تغيير كلمة المرور
-@router.post("/change-password")
-def change_password(
-    old_password: str,
-    new_password: str,
-    session_id: str = Cookie(None),
+# 5) التحقق من صلاحيات الأدمن
+def get_current_admin(
+    user_id: int = Depends(get_current_user),
     db: Session = Depends(get_db)
-):
-    if not session_id:
-        raise HTTPException(401, "غير مسجل دخول")
-    session = db.execute(
-        "SELECT user_id FROM sessions WHERE session_id = :sid",
-        {"sid": session_id}
+) -> int:
+    role = db.execute(
+        "SELECT role FROM users WHERE id = :uid",
+        {"uid": user_id}
     ).fetchone()
-    if not session:
-        raise HTTPException(401, "جلسة غير صالحة")
+    if not role or role.role != "admin":
+        raise HTTPException(403, "ليس لديك صلاحيات المدير")
+    return user_id
 
-    user = db.execute(
-        "SELECT password_hash FROM users WHERE id = :uid",
-        {"uid": session.user_id}
-    ).fetchone()
-
-    if not user or not bcrypt.verify(old_password, user.password_hash):
-        raise HTTPException(403, "كلمة المرور القديمة غير صحيحة")
-
-    new_hash = bcrypt.hash(new_password)
-    db.execute(
-        "UPDATE users SET password_hash = :ph WHERE id = :uid",
-        {"ph": new_hash, "uid": session.user_id}
-    )
-    db.commit()
-    return {"message": "تم تغيير كلمة المرور بنجاح"}
+# 6) مسار لاختبار صلاحيات الأدمن (اختياري)
+@router.get("/me")
+def get_me(user_id: int = Depends(get_current_user)):
+    return {"user_id": user_id}
