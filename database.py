@@ -12,6 +12,13 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base = declarative_base()
 
+# database.py (أضف هذا الجزء)
+
+def init_db():
+    # ينشئ كل الجداول إذا لم تكن موجودة
+    from .models import Base   # أو من المكان الذي خزّنت فيه تعريف Base والجميع
+    Base.metadata.create_all(bind=engine)
+
 class User(Base):
     __tablename__ = "users"
     id             = Column(BigInteger, primary_key=True, index=True)
