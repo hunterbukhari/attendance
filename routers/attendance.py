@@ -17,7 +17,7 @@ def get_db():
 # إعداد مركز الموقع المسموح ونصف القطر بالمتر
 ALLOWED_LAT = 24.7136
 ALLOWED_LNG = 46.6753
-MAX_DISTANCE_METERS = 100
+MAX_DISTANCE_METERS = 1000
 
 def distance(lat1, lon1, lat2, lon2):
     R = 6371000
