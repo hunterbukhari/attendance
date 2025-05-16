@@ -1,15 +1,19 @@
-# routers/auth.py
-
 from fastapi import APIRouter, HTTPException, Response, Depends, Cookie
 from sqlalchemy.orm import Session
 from passlib.hash import bcrypt
 import uuid
 from datetime import datetime, timedelta
 from database import SessionLocal
+from pydantic import BaseModel
 
 router = APIRouter()
 
 SESSION_DURATION = timedelta(minutes=15)
+
+# نموذج بيانات تسجيل الدخول
+class LoginInput(BaseModel):
+    national_id: str
+    password: str
 
 # 1) Dependency لإدارة جلسة قاعدة البيانات
 def get_db():
@@ -36,19 +40,21 @@ def register(national_id: str, password: str, db: Session = Depends(get_db)):
 # 3) تسجيل الدخول وإنشاء جلسة قصيرة الأمد
 @router.post("/login")
 def login(
-    national_id: str,
-    password: str,
+    data: LoginInput,
     response: Response,
     db: Session = Depends(get_db)
 ):
+    national_id = data.national_id
+    password = data.password
+
     row = db.execute(
         "SELECT id, password_hash, role FROM users WHERE national_id = :nid",
         {"nid": national_id}
     ).fetchone()
+
     if not row or not bcrypt.verify(password, row.password_hash):
         raise HTTPException(401, "بيانات الدخول غير صحيحة")
 
-    # إنشاء session_id وجعله صالحًا 15 دقيقة
     session_id = str(uuid.uuid4())
     expires_at = datetime.utcnow() + SESSION_DURATION
 
@@ -58,7 +64,6 @@ def login(
     )
     db.commit()
 
-    # وضع الكوكي في المتصفح
     response.set_cookie(
         key="session_id",
         value=session_id,
