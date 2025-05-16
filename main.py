@@ -11,7 +11,7 @@ app = FastAPI()
 # ✅ 2) إعداد CORS للسماح بطلبات من GitHub Pages
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://hunterbukhari.github.io/attendance"],  # اسمح فقط لهذا الدومين
+    allow_origins=["https://hunterbukhari.github.io"],  # اسمح فقط لهذا الدومين
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
