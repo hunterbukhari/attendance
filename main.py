@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware  # ✅ استيراد CORS
+from fastapi.middleware.cors import CORSMiddleware
 from database import init_db
 from routers.auth import router as auth_router
 from routers.attendance import router as attendance_router
@@ -8,10 +8,12 @@ from routers.export_excel import router as export_router
 # 1) إنشاء التطبيق
 app = FastAPI()
 
-# ✅ 2) إعداد CORS للسماح بطلبات من GitHub Pages
+# 2) إضافة Middleware لـ CORS
+#    هنا نسمح لأي موقع (origin) بإرسال طلبات إلى ה־API.  
+#    إذا أردت تشديد الأمان لاحقًا، استبدل ["*"] بقائمة النطاقات المسموح بها.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://hunterbukhari.github.io"],  # اسمح فقط لهذا الدومين
+    allow_origins=["*"],            # أو ['https://hunterbukhari.github.io'] لتحديد منشأ واحد
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
