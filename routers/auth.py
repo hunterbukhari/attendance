@@ -47,11 +47,10 @@ def register(national_id: str, password: str, db: Session = Depends(get_db)):
 # 2) تسجيل الدخول (ينشئ session ويضعه في كوكي)
 # ----------------------------------------
 @router.post("/login")
-def login(
-    req: LoginRequest,
-    response: Response,
-    db: Session = Depends(get_db)
-):
+def login(req: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    nid = req.national_id
+    pwd = req.password
+    
     row = db.execute(
         "SELECT id, password_hash, role FROM users WHERE national_id = :nid",
         {"nid": req.national_id}
