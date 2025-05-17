@@ -14,7 +14,7 @@ app = FastAPI()
 #    أثناء التطوير ممكن ترك "*" لكن للإنتاج حدد origin الصالح فقط.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],            # أو ["https://hunterbukhari.github.io"]
+    allow_origins=["https://hunterbukhari.github.io/attendance"],            # أو ["https://hunterbukhari.github.io"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
