@@ -9,17 +9,25 @@ from routers.export_excel import router as export_router
 
 app = FastAPI()
 
-# ⬇️ Allow your front-end origin (or "*" for all during testing)
+# ----------------------------------------
+# 1) تفعيل CORS للسماح للواجهة الأمامية بإرسال الطلبات
+# ----------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://hunterbukhari.github.io"],
-    allow_credentials=True,
+    allow_origins=["*"],         # في الإنتاج: ضع هنا رابط الواجهة فقط، مثال: ["https://example.com"]
+    allow_credentials=True,      # لتمرير الكوكيز
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ----------------------------------------
+# 2) إنشاء الجداول في قاعدة البيانات (إن لم تكن موجودة)
+# ----------------------------------------
 init_db()
 
-app.include_router(auth_router, prefix="/auth", tags=["auth"])
+# ----------------------------------------
+# 3) تسجيل الـ routers
+# ----------------------------------------
+app.include_router(auth_router,       prefix="/auth",       tags=["auth"])
 app.include_router(attendance_router, prefix="/attendance", tags=["attendance"])
-app.include_router(export_router, prefix="/export", tags=["export"])
+app.include_router(export_router,     prefix="/export",     tags=["export"])
